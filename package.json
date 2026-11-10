@@ -1,0 +1,32 @@
+{
+  "name": "paste",
+  "private": true,
+  "license": "CC-BY-ND-4.0",
+  "type": "module",
+  "scripts": {
+    "build": "cf build",
+    "deploy": "pnpm run build && cf deploy --prebuilt",
+    "dev": "cf dev",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxfmt --check . && oxlint .",
+    "format": "oxfmt .",
+    "prepare": "lefthook install"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "2.0.0-beta.v.4",
+    "@cloudflare/workers-types": "^5.20261110.1",
+    "@types/node": "^26.6.2",
+    "cf": "1.0.0-beta.21",
+    "lefthook": "^2.1.14",
+    "oxfmt": "^0.76.0",
+    "oxlint": "^1.85.0",
+    "oxlint-plugin-aspizuism": "^1.0.6",
+    "oxlint-tsgolint": "^7.0.2002",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.5"
+  },
+  "dependencies": {
+    "hono": "^4.13.17"
+  }
+}

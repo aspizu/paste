@@ -1,0 +1,6 @@
+/.cloudflare/
+/node_modules/
+/.pnpm-store/
+/dist/
+.dev.vars*
+.DS_Store

@@ -1,0 +1,15 @@
+pre-commit:
+  jobs:
+    - name: oxfmt
+      glob: "*.{cjs,cts,js,json,jsonc,md,mjs,mts,ts,yaml,yml}"
+      run: pnpm exec oxfmt {staged_files}
+      stage_fixed: true
+
+    - name: oxlint
+      glob: "*.{cjs,cts,js,mjs,mts,ts}"
+      run: pnpm exec oxlint {staged_files}
+
+pre-push:
+  jobs:
+    - name: typecheck
+      run: pnpm run typecheck
