@@ -1,4 +1,4 @@
-import {Hono} from "hono"
+import {Hono, type Context} from "hono"
 
 import {FilePage, type FileAction} from "./components/file-page"
 import {Page} from "./components/page"
@@ -7,6 +7,29 @@ import {ensureLoggedIn} from "./utils/auth"
 import sql from "./utils/sql"
 
 const app = new Hono<{Bindings: Bindings}>()
+
+async function _renderFile(
+  c: Context<{Bindings: Bindings}>,
+  slug: string,
+  file: {content: string; content_type: string},
+) {
+  let content = file.content
+  if (
+    /^text\/html(?:\s*;|$)/i.test(file.content_type) &&
+    slug !== "before.html" &&
+    slug !== "after.html"
+  ) {
+    const {results} = await sql(c)`
+      SELECT slug, content FROM files WHERE slug IN ('before.html', 'after.html')
+    `.all<{slug: string; content: string}>()
+    const before =
+      results.find((fragment) => fragment.slug === "before.html")?.content ?? ""
+    const after =
+      results.find((fragment) => fragment.slug === "after.html")?.content ?? ""
+    content = before + content + after
+  }
+  return c.body(content, 200, {"Content-Type": file.content_type})
+}
 
 app.on(["GET", "POST"], ["/", "/:slug{.+}"], async (c) => {
   if (c.req.method === "POST") {
@@ -31,8 +54,8 @@ app.on(["GET", "POST"], ["/", "/:slug{.+}"], async (c) => {
 
   if (c.req.method === "GET") {
     const file = await sql(c)`
-      SELECT content FROM files WHERE slug = ${slug}
-    `.first<{content: string}>()
+      SELECT content, content_type FROM files WHERE slug = ${slug}
+    `.first<{content: string; content_type: string}>()
     if (!file) {
       return c.html(
         <Page title="Page not found">No page exists at this address.</Page>,
@@ -41,10 +64,16 @@ app.on(["GET", "POST"], ["/", "/:slug{.+}"], async (c) => {
     }
     if (action) {
       return c.html(
-        <FilePage slug={slug} path={path} action={action} content={file.content} />,
+        <FilePage
+          slug={slug}
+          path={path}
+          action={action}
+          content={file.content}
+          contentType={file.content_type}
+        />,
       )
     }
-    return c.html(file.content)
+    return _renderFile(c, slug, file)
   }
 
   if (action === "delete") {
@@ -60,14 +89,34 @@ app.on(["GET", "POST"], ["/", "/:slug{.+}"], async (c) => {
     return c.redirect("/", 303)
   }
 
-  const {content} = await c.req.parseBody()
+  const {content, content_type = "text/html; charset=UTF-8"} = await c.req.parseBody()
+  const contentType = typeof content_type === "string" ? content_type.trim() : ""
   if (typeof content !== "string") {
     return c.html(
       <FilePage
         slug={slug}
         path={path}
         action={action}
+        contentType={contentType}
         error="Content must be text."
+      />,
+      400,
+    )
+  }
+
+  if (
+    !/^[\w!#$%&'*+.^`|~-]+\/[\w!#$%&'*+.^`|~-]+(?:[ \t]*;[\t\x20-\x7e]*)?$/.test(
+      contentType,
+    )
+  ) {
+    return c.html(
+      <FilePage
+        slug={slug}
+        path={path}
+        action={action}
+        content={content}
+        contentType={contentType}
+        error="Enter a valid content type."
       />,
       400,
     )
@@ -75,8 +124,8 @@ app.on(["GET", "POST"], ["/", "/:slug{.+}"], async (c) => {
 
   if (action === "create") {
     const file = await sql(c)`
-      INSERT INTO files (slug, content)
-      VALUES (${slug}, ${content})
+      INSERT INTO files (slug, content, content_type)
+      VALUES (${slug}, ${content}, ${contentType})
       ON CONFLICT (slug) DO NOTHING
       RETURNING slug
     `.first<{slug: string}>()
@@ -87,6 +136,7 @@ app.on(["GET", "POST"], ["/", "/:slug{.+}"], async (c) => {
           path={path}
           action={action}
           content={content}
+          contentType={contentType}
           error="A page already exists at this address."
         />,
         409,
@@ -97,7 +147,7 @@ app.on(["GET", "POST"], ["/", "/:slug{.+}"], async (c) => {
 
   const file = await sql(c)`
     UPDATE files
-    SET content = ${content}, updated_at = unixepoch()
+    SET content = ${content}, content_type = ${contentType}, updated_at = unixepoch()
     WHERE slug = ${slug}
     RETURNING slug
   `.first<{slug: string}>()
