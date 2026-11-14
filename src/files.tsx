@@ -8,11 +8,11 @@ import sql from "./utils/sql"
 
 const app = new Hono<{Bindings: Bindings}>()
 
-app.on(["GET", "POST"], "/:slug{.+}", async (c) => {
+app.on(["GET", "POST"], ["/", "/:slug{.+}"], async (c) => {
   if (c.req.method === "POST") {
     await ensureLoggedIn(c)
   }
-  const slug = c.req.param("slug")
+  const slug = c.req.param("slug") ?? ""
   const path = new URL(c.req.url).pathname.replace(/^\/\//, "/%2F")
   const actions = (["create", "edit", "delete"] as const).filter(
     (action) => c.req.query(action) !== undefined,
