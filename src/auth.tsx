@@ -36,12 +36,14 @@ function _redirectTo(next: unknown, requestUrl: string) {
 
 const authMiddleware = createMiddleware<{Bindings: Bindings}>(async (c, next) => {
   const {success} = await c.env.RATELIMIT.limit({
-    key: JSON.stringify({ip: "global", pathname: c.req.path}),
+    key: `${c.req.method} ${c.req.path}`,
   })
   if (!success) {
+    c.header("Retry-After", "60")
+    c.header("Cache-Control", "no-store")
     return c.html(
       <Page title="Too many requests">
-        <p>Rate limit exceeded. Try again shortly.</p>
+        <p>Rate limit exceeded. Try again in a minute.</p>
       </Page>,
       429,
     )

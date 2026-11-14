@@ -12,7 +12,7 @@ export default defineConfig({
       JWT_SECRET: bindings.secret(),
       RATELIMIT: bindings.rateLimit({
         namespace: "001",
-        simple: {limit: 1000, period: 10},
+        simple: {limit: 10, period: 60},
       }),
     },
   },
