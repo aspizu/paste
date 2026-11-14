@@ -23,7 +23,10 @@ export function LoginPage({next, error}: {next: string; error?: string}) {
             autofocus
           />
         </p>
-        <button type="submit">Log in</button>
+        <button type="submit">Log in</button>{" "}
+        <span class="htmx-indicator" role="status">
+          Logging in…
+        </span>
       </form>
     </Page>
   )

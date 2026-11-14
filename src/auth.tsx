@@ -114,10 +114,15 @@ export default new Hono<{Bindings: Bindings}>()
     return c.html(
       <Page title="Log out">
         <form method="post" action="/logout">
-          <button type="submit">Log out</button>
+          <button type="submit">Log out</button>{" "}
+          <span class="htmx-indicator" role="status">
+            Logging out…
+          </span>
         </form>
         <p>
-          <a href="/">Cancel</a>
+          <a href="/" hx-boost="false">
+            Cancel
+          </a>
         </p>
       </Page>,
     )

@@ -33,6 +33,7 @@ export function FilePage({
 }) {
   const title = {create: "Create", edit: "Edit", delete: "Delete"}[action]
   const button = {create: "Publish", edit: "Save", delete: "Delete"}[action]
+  const progress = {create: "Publishing…", edit: "Saving…", delete: "Deleting…"}[action]
   return (
     <Page title={`${title} /${slug}`}>
       {error && <p role="alert">{error}</p>}
@@ -68,10 +69,15 @@ export function FilePage({
             </p>
           </>
         )}
-        <button type="submit">{button}</button>
+        <button type="submit">{button}</button>{" "}
+        <span class="htmx-indicator" role="status">
+          {progress}
+        </span>
       </form>
       <p>
-        <a href={action === "create" ? "/" : path}>Cancel</a>
+        <a href={action === "create" ? "/" : path} hx-boost="false">
+          Cancel
+        </a>
       </p>
     </Page>
   )
