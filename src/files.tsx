@@ -3,20 +3,15 @@ import {Hono} from "hono"
 import {FilePage, type FileAction} from "./components/file-page"
 import {Page} from "./components/page"
 import type {Bindings} from "./env"
-import {isLoggedIn} from "./utils/auth"
+import {ensureLoggedIn} from "./utils/auth"
 import sql from "./utils/sql"
 
 const app = new Hono<{Bindings: Bindings}>()
 
-app.use("*", async (c, next) => {
-  if (!(await isLoggedIn(c))) {
-    const url = new URL(c.req.url)
-    return c.redirect(`/login?next=${encodeURIComponent(url.pathname + url.search)}`)
-  }
-  return next()
-})
-
 app.on(["GET", "POST"], "/:slug{.+}", async (c) => {
+  if (c.req.method === "POST") {
+    await ensureLoggedIn(c)
+  }
   const slug = c.req.param("slug")
   const path = new URL(c.req.url).pathname.replace(/^\/\//, "/%2F")
   const actions = (["create", "edit", "delete"] as const).filter(

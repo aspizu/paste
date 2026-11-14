@@ -10,7 +10,7 @@ import {z} from "zod"
 import {LoginPage} from "./components/login-page"
 import {Page} from "./components/page"
 import type {Bindings} from "./env"
-import {isLoggedIn} from "./utils/auth"
+import {ensureLoggedIn, isLoggedIn} from "./utils/auth"
 
 const sessionMaxAge = 7 * 24 * 60 * 60
 
@@ -108,9 +108,7 @@ export default new Hono<{Bindings: Bindings}>()
     },
   )
   .get("/logout", async (c) => {
-    if (!(await isLoggedIn(c))) {
-      return c.redirect("/login")
-    }
+    await ensureLoggedIn(c)
     return c.html(
       <Page title="Log out">
         <form method="post" action="/logout">
