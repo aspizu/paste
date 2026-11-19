@@ -1,12 +1,38 @@
 import {Hono, type Context} from "hono"
 
 import {FilePage, type FileAction} from "./components/file-page"
+import {HomePage} from "./components/home-page"
 import {Page} from "./components/page"
 import type {Bindings} from "./env"
-import {ensureLoggedIn} from "./utils/auth"
+import {ensureLoggedIn, isLoggedIn} from "./utils/auth"
 import sql from "./utils/sql"
 
 const app = new Hono<{Bindings: Bindings}>()
+const pageSize = 25
+
+app.get("/", async (c) => {
+  const requestedPage = c.req.query("page") ?? "1"
+  const page = Number(requestedPage)
+  const offset = (page - 1) * pageSize
+  if (!/^[1-9]\d*$/.test(requestedPage) || !Number.isSafeInteger(offset)) {
+    return c.redirect("/")
+  }
+
+  const {results} = await sql(c)`
+    SELECT slug FROM files WHERE slug <> '' ORDER BY slug LIMIT ${pageSize + 1} OFFSET ${offset}
+  `.all<{slug: string}>()
+  if (page > 1 && results.length === 0) {
+    return c.redirect("/")
+  }
+
+  return c.html(
+    <HomePage
+      slugs={results.slice(0, pageSize).map(({slug}) => slug)}
+      page={page}
+      hasNextPage={results.length > pageSize}
+    />,
+  )
+})
 
 async function _renderFile(
   c: Context<{Bindings: Bindings}>,
@@ -31,11 +57,30 @@ async function _renderFile(
   return c.body(content, 200, {"Content-Type": file.content_type})
 }
 
-app.on(["GET", "POST"], ["/", "/:slug{.+}"], async (c) => {
+function _renderMissingFile(
+  c: Context<{Bindings: Bindings}>,
+  path: string,
+  canCreate: boolean,
+) {
+  return c.html(
+    <Page title="Page not found">
+      <p>No page exists at this address.</p>
+      {canCreate && (
+        <p>
+          <a href={`${path}?create`}>Create page</a>
+        </p>
+      )}
+    </Page>,
+    404,
+    {"Cache-Control": "private, no-store"},
+  )
+}
+
+app.on(["GET", "POST"], "/:slug{.+}", async (c) => {
   if (c.req.method === "POST") {
     await ensureLoggedIn(c)
   }
-  const slug = c.req.param("slug") ?? ""
+  const slug = c.req.param("slug")
   const path = new URL(c.req.url).pathname.replace(/^\/\//, "/%2F")
   const actions = (["create", "edit", "delete"] as const).filter(
     (action) => c.req.query(action) !== undefined,
@@ -57,10 +102,7 @@ app.on(["GET", "POST"], ["/", "/:slug{.+}"], async (c) => {
       SELECT content, content_type FROM files WHERE slug = ${slug}
     `.first<{content: string; content_type: string}>()
     if (!file) {
-      return c.html(
-        <Page title="Page not found">No page exists at this address.</Page>,
-        404,
-      )
+      return _renderMissingFile(c, path, await isLoggedIn(c))
     }
     if (action) {
       return c.html(
@@ -81,10 +123,7 @@ app.on(["GET", "POST"], ["/", "/:slug{.+}"], async (c) => {
       DELETE FROM files WHERE slug = ${slug} RETURNING slug
     `.first<{slug: string}>()
     if (!file) {
-      return c.html(
-        <Page title="Page not found">No page exists at this address.</Page>,
-        404,
-      )
+      return _renderMissingFile(c, path, true)
     }
     return c.redirect("/", 303)
   }
@@ -152,10 +191,7 @@ app.on(["GET", "POST"], ["/", "/:slug{.+}"], async (c) => {
     RETURNING slug
   `.first<{slug: string}>()
   if (!file) {
-    return c.html(
-      <Page title="Page not found">No page exists at this address.</Page>,
-      404,
-    )
+    return _renderMissingFile(c, path, true)
   }
   return c.redirect(path, 303)
 })
