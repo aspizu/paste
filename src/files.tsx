@@ -76,6 +76,19 @@ function _renderMissingFile(
   )
 }
 
+function _confirmInPlaceSave(c: Context<{Bindings: Bindings}>, path: string) {
+  if (c.req.header("HX-Request") === "true") {
+    return c.html(
+      <span id="save-status" hx-swap-oob="innerHTML">
+        Saved.
+      </span>,
+      200,
+      {"HX-Reswap": "none show:none"},
+    )
+  }
+  return c.redirect(`${path}?edit&saved`, 303)
+}
+
 app.on(["GET", "POST"], "/:slug{.+}", async (c) => {
   if (c.req.method === "POST") {
     await ensureLoggedIn(c)
@@ -93,14 +106,16 @@ app.on(["GET", "POST"], "/:slug{.+}", async (c) => {
     )
   }
 
-  if (c.req.method === "GET" && action === "create") {
-    return c.html(<FilePage slug={slug} path={path} action={action} />)
-  }
-
   if (c.req.method === "GET") {
     const file = await sql(c)`
       SELECT content, content_type FROM files WHERE slug = ${slug}
     `.first<{content: string; content_type: string}>()
+    if (action === "create") {
+      if (file) {
+        return c.redirect(`${path}?edit`)
+      }
+      return c.html(<FilePage slug={slug} path={path} action={action} />)
+    }
     if (!file) {
       return _renderMissingFile(c, path, await isLoggedIn(c))
     }
@@ -112,6 +127,7 @@ app.on(["GET", "POST"], "/:slug{.+}", async (c) => {
           action={action}
           content={file.content}
           contentType={file.content_type}
+          saved={c.req.query("saved") !== undefined}
         />,
       )
     }
@@ -128,7 +144,11 @@ app.on(["GET", "POST"], "/:slug{.+}", async (c) => {
     return c.redirect("/", 303)
   }
 
-  const {content, content_type = "text/html; charset=UTF-8"} = await c.req.parseBody()
+  const {
+    content,
+    content_type = "text/html; charset=UTF-8",
+    save_in_place,
+  } = await c.req.parseBody()
   const contentType = typeof content_type === "string" ? content_type.trim() : ""
   if (typeof content !== "string") {
     return c.html(
@@ -169,17 +189,7 @@ app.on(["GET", "POST"], "/:slug{.+}", async (c) => {
       RETURNING slug
     `.first<{slug: string}>()
     if (!file) {
-      return c.html(
-        <FilePage
-          slug={slug}
-          path={path}
-          action={action}
-          content={content}
-          contentType={contentType}
-          error="A page already exists at this address."
-        />,
-        409,
-      )
+      return c.redirect(`${path}?edit`, 303)
     }
     return c.redirect(path, 303)
   }
@@ -192,6 +202,9 @@ app.on(["GET", "POST"], "/:slug{.+}", async (c) => {
   `.first<{slug: string}>()
   if (!file) {
     return _renderMissingFile(c, path, true)
+  }
+  if (save_in_place === "1") {
+    return _confirmInPlaceSave(c, path)
   }
   return c.redirect(path, 303)
 })

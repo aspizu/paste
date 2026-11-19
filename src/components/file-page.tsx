@@ -23,6 +23,7 @@ export function FilePage({
   content = "",
   contentType = "text/html; charset=UTF-8",
   error,
+  saved = false,
 }: {
   slug: string
   path: string
@@ -30,6 +31,7 @@ export function FilePage({
   content?: string
   contentType?: string
   error?: string
+  saved?: boolean
 }) {
   const title = {create: "Create", edit: "Edit", delete: "Delete"}[action]
   const button = {create: "Publish", edit: "Save", delete: "Delete"}[action]
@@ -37,7 +39,11 @@ export function FilePage({
   return (
     <Page title={`${title} /${slug}`}>
       {error && <p role="alert">{error}</p>}
-      <form method="post" action={`${path}?${action}`}>
+      <form
+        method="post"
+        action={`${path}?${action}`}
+        hx-disabled-elt={action === "edit" ? "#save, #save-in-place" : undefined}
+      >
         {action === "delete" ? (
           <p>Are you sure you want to delete this page?</p>
         ) : (
@@ -69,7 +75,19 @@ export function FilePage({
             </p>
           </>
         )}
-        <button type="submit">{button}</button>{" "}
+        <button type="submit" id={action === "edit" ? "save" : undefined}>
+          {button}
+        </button>{" "}
+        {action === "edit" && (
+          <>
+            <button type="submit" id="save-in-place" name="save_in_place" value="1">
+              Save in place
+            </button>{" "}
+            <span id="save-status" role="status">
+              {saved && "Saved."}
+            </span>{" "}
+          </>
+        )}
         <span class="htmx-indicator" role="status">
           {progress}
         </span>
